@@ -1,7 +1,8 @@
-#include "IPv4.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include "IPv4.h"
+#include "uInt32BitManipulations.h"
 
 IPv4 *initIPv4(IPv4 **ipAddress, u_int8_t ipArray[], u_int8_t *CIDR)
 {
@@ -23,7 +24,7 @@ IPv4 *initIPv4(IPv4 **ipAddress, u_int8_t ipArray[], u_int8_t *CIDR)
     *ipAddress = (IPv4 *)temp;
 
     // Convert IP adress to binary string
-    (*ipAddress)->address = convertDecimalIPtoBinaryString(ipArray, IPv4_PARTS_LENGTH);
+    (*ipAddress)->address = convertDecimalIPtoUnsignedInt(ipArray, IPv4_PARTS_LENGTH);
 
     // Determine IP class
     (*ipAddress)->ipClass = determineIPClass(ipAddress);
@@ -53,53 +54,10 @@ IPv4 *initIPv4(IPv4 **ipAddress, u_int8_t ipArray[], u_int8_t *CIDR)
     return (*ipAddress);
 }
 
-void setBit(u_int32_t *address, int k)
-{
-    *address |= (1 << (k % SIZE_OF_UINT32_IN_BITS));
-
-    return;
-}
-
-void clearBit(u_int32_t *address, int k)
-{
-    *address &= ~(1 << (k % SIZE_OF_UINT32_IN_BITS));
-
-    return;
-}
-
-bool isBitSet(u_int32_t *address, int k)
-{
-    return (*address & (1 << (k % SIZE_OF_UINT32_IN_BITS))) != 0;
-}
-
-void toggleBit(u_int32_t *address, int k)
-{
-    *address ^= (1 << (k % SIZE_OF_UINT32_IN_BITS));
-    return;
-}
-
-void printBitString(u_int32_t *address)
-{
-    int i;
-
-    // LITTLE ENDIAN... printing in reverse order
-    for (i = SIZE_OF_UINT32_IN_BITS - 1; i >= 0; i--)
-    {
-        printf((isBitSet(&(*address), i)) ? "\x1b[33m1\x1b[0m" : "0");
-        if ((SIZE_OF_UINT32_IN_BITS - i) % 8 == 0)
-        {
-            printf(" ");
-        }
-        fflush(NULL); // flushing must be done 'cuz we're not using \n
-    }
-    printf("\n");
-
-    return;
-}
-
 void printIPv4(IPv4 **ipAddress)
 {
-    u_int8_t netmaskArr[IPv4_PARTS_LENGTH], broadcastIDArr[IPv4_PARTS_LENGTH], networkIDArr[IPv4_PARTS_LENGTH];
+    // u_int8_t netmaskArr[IPv4_PARTS_LENGTH], broadcastIDArr[IPv4_PARTS_LENGTH], networkIDArr[IPv4_PARTS_LENGTH];
+    u_int32_t networkID, broadcastID, netmask;
 
     printf("\t\tIP INFO\n");
     printf("IP-Class: \t%c\n", (*ipAddress)->ipClass);
@@ -107,47 +65,39 @@ void printIPv4(IPv4 **ipAddress)
     printf("IP: Binary string: ");
     printBitString(&((*ipAddress)->address));
     printf("Dotted decimal: ");
-    printDottedDecimalRepresentation((*ipAddress)->ipArray);
+    printDottedDecimalRepresentation((*ipAddress)->address);
     printf("\n");
 
     printf("\t\tNetmask INFO\n");
-    calculateNetmask(ipAddress);
-    printf("Netmask 32-bit decimal representation: %u\n", (*ipAddress)->netmask);
+    netmask = calculateNetmask(ipAddress);
+    printf("Netmask 32-bit decimal representation: %u\n", netmask);
     printf("Netmask: Binary string: ");
-    printBitString(&((*ipAddress)->netmask));
+    printBitString(&netmask);
     printf("Dotted decimal: ");
-    dottedDecimal(&((*ipAddress)->netmask), netmaskArr);
-    printDottedDecimalRepresentation(netmaskArr);
+    printDottedDecimalRepresentation(netmask);
     printf("\n");
 
     printf("\t\tNetwork ID INFO\n");
-    calculateNetworkID(ipAddress);
-    printf("Network-ID 32-bit decimal representation: %u\n", (*ipAddress)->networkID);
+    networkID = calculateNetworkID(ipAddress);
+    printf("Network-ID 32-bit decimal representation: %u\n", networkID);
     printf("Network-ID: Binary string: ");
-    printBitString(&((*ipAddress)->networkID));
+    printBitString(&networkID);
     printf("Dotted decimal: ");
-    dottedDecimal(&((*ipAddress)->networkID), networkIDArr);
-    printDottedDecimalRepresentation(networkIDArr);
+    printDottedDecimalRepresentation(networkID);
     printf("\n");
 
     printf("\t\tBroadcast ID INFO\n");
-    calculateBroadcastID(ipAddress);
-    printf("Broadcast-ID 32-bit decimal representation: %u\n", (*ipAddress)->broadcastID);
+    broadcastID = calculateBroadcastID(ipAddress);
+    printf("Broadcast-ID 32-bit decimal representation: %u\n", broadcastID);
     printf("Broadcast-ID: Binary string: ");
-    printBitString(&((*ipAddress)->broadcastID));
+    printBitString(&broadcastID);
     printf("Dotted decimal: ");
-    dottedDecimal(&((*ipAddress)->broadcastID), broadcastIDArr);
-    printDottedDecimalRepresentation(broadcastIDArr);
+    printDottedDecimalRepresentation(broadcastID);
 
     printf("\n");
     printf("\t\tHost Range INFO\n");
     printHostsRange(ipAddress);
     return;
-}
-
-char whatIsIthBit(u_int32_t *address, int k)
-{
-    return (isBitSet(&(*address), k)) ? '1' : '0';
 }
 
 int bitwiseConcatIntergers(unsigned int a, unsigned int b)
@@ -160,7 +110,7 @@ int bitCountAnInteger(int num)
     return num == 0 ? 1 : (int)log2(num) + 1;
 }
 
-int convertDecimalIPtoBinaryString(u_int8_t ipArray[], int size)
+int convertDecimalIPtoUnsignedInt(u_int8_t ipArray[], int size)
 {
     int i;
     unsigned int result = 0;
@@ -219,8 +169,6 @@ u_int32_t calculateNetmask(IPv4 **ipAddress)
         }
     }
 
-    (*ipAddress)->netmask = netmask;
-
     return netmask;
 }
 
@@ -240,7 +188,6 @@ u_int32_t calculateBroadcastID(IPv4 **ipAddress)
             setBit(&broadcast, SIZE_OF_UINT32_IN_BITS - i - 1);
         }
     }
-    (*ipAddress)->broadcastID = broadcast;
 
     return broadcast;
 }
@@ -248,15 +195,13 @@ u_int32_t calculateBroadcastID(IPv4 **ipAddress)
 u_int32_t calculateNetworkID(IPv4 **ipAddress)
 {
     u_int32_t ip = (*ipAddress)->address;
-    u_int32_t netmask = (*ipAddress)->netmask;
+    u_int32_t netmask = calculateNetmask(ipAddress);
     u_int32_t networkID = ip & netmask;
-
-    (*ipAddress)->networkID = networkID;
 
     return networkID;
 }
 
-void dottedDecimal(u_int32_t *address, u_int8_t decimalRep[])
+void dottedDecimal(u_int32_t address, u_int8_t decimalRep[])
 {
     int i;
     unsigned int biggestNumberOfByte = 255;
@@ -264,7 +209,7 @@ void dottedDecimal(u_int32_t *address, u_int8_t decimalRep[])
     for (i = 0; i < IPv4_PARTS_LENGTH; i++)
     {
         shiftOffset = ((IPv4_PARTS_LENGTH - i - 1) * 8);
-        decimalRep[i] = ((biggestNumberOfByte << shiftOffset) & *address) >> shiftOffset;
+        decimalRep[i] = ((biggestNumberOfByte << shiftOffset) & address) >> shiftOffset;
     }
 
     return;
@@ -297,8 +242,11 @@ void dottedDecimal(u_int32_t *address, u_int8_t decimalRep[])
     */
 }
 
-void printDottedDecimalRepresentation(u_int8_t decimalRep[])
+void printDottedDecimalRepresentation(u_int32_t address)
 {
+    u_int8_t decimalRep[IPv4_PARTS_LENGTH];
+    dottedDecimal(address, decimalRep);
+
     int i;
     for (i = 0; i < IPv4_PARTS_LENGTH; i++)
     {
@@ -317,14 +265,14 @@ void printHostsRange(IPv4 **ipAddress)
     unsigned int firstHost, lastHost;
 
     // Set the last bit of the network ID to get the first host
-    firstHost = (*ipAddress)->networkID;
+    firstHost = calculateNetworkID(ipAddress);
     setBit(&firstHost, 0);
 
     printf("First host: %u\n", firstHost);
     printBitString(&firstHost);
 
     // Clear the first bit of broadcastID to get the last host
-    lastHost = (*ipAddress)->broadcastID;
+    lastHost = calculateBroadcastID(ipAddress);
     clearBit(&lastHost, 0);
 
     printf("Last host: %u\n", lastHost);
